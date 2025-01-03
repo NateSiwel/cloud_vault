@@ -15,6 +15,7 @@ typedef struct Node {
     char *checksum;
     char *blob_id;
     int is_uploaded;
+    int is_deleted;
     struct Node *child;
     struct Node *sibling;
 } Node;

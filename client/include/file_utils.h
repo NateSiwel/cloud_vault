@@ -7,9 +7,6 @@
 #define MAX_PATH 1024
 #define MAX_FILE_SIZE 1048576
 
-/* Populates a parent node with directory contents */
-void processDirectory(const char *dirpath, Node *parent);
-
 /* Reads the contents of a file into memory */
 char *readFileContents(const char *filepath, size_t *size);
 
@@ -18,5 +15,8 @@ void uploadFile(Node *node, const char *filepath);
 
 /* Processes a node recursively, checking for file changes */
 void processNode(Node *node, const char *currentPath);
+
+void processTree(const char *dirpath, Node *node);
+
 
 #endif // FILE_UTILS_H

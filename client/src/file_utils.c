@@ -8,53 +8,6 @@
 #include "node.h"
 #include "checksum.h"
 
-/* Populates parent node with content in dirpath */
-void processDirectory(const char *dirpath, Node *parent) {
-    DIR *dir = opendir(dirpath);
-    if (!dir) {
-        perror("Failed to open directory");
-        return;
-    }
-
-    struct dirent *entry;
-    while ((entry = readdir(dir)) != NULL) {
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-            continue;
-        }
-
-        char filepath[MAX_PATH];
-        snprintf(filepath, MAX_PATH, "%s/%s", dirpath, entry->d_name);
-
-        struct stat file_stat;
-        if (stat(filepath, &file_stat) == -1) {
-            perror("Failed to get file stats");
-            continue;
-        }
-
-        if (S_ISREG(file_stat.st_mode)) {
-            printf("Processing file: %s\n", filepath);
-
-            size_t size;
-            char *content = readFileContents(filepath, &size);
-            if (content) {
-                free(content);
-            }
-
-            Node *file_node = create_node(entry->d_name, FILE_NODE);
-            add_child(parent, file_node);
-        } else if (S_ISDIR(file_stat.st_mode)) {
-            printf("Entering directory: %s\n", filepath);
-
-            Node *folder_node = create_node(entry->d_name, FOLDER_NODE);
-            add_child(parent, folder_node);
-
-            processDirectory(filepath, folder_node);
-        }
-    }
-
-    closedir(dir);
-}
-
 /* Reads file contents using fread */
 char *readFileContents(const char *filepath, size_t *size) {
     FILE *file = fopen(filepath, "rb");
@@ -103,32 +56,103 @@ void uploadFile(Node *node, const char *filepath) {
     node->blob_id = strdup("unique_blob_id");  // Replace with server-generated ID
 }
 
-/* Processes a node recursively, checking for changes */
-void processNode(Node *node, const char *currentPath) {
-    if (!node) return;
+void processTree(const char *dirpath, Node *node) {
+    DIR *dir = opendir(dirpath);
+    if (!dir) {
+        perror("Failed to open directory");
+        return;
+    }
 
-    char fullPath[MAX_PATH];
-    snprintf(fullPath, MAX_PATH, "%s/%s", currentPath, node->name);
+    // Mark all existing child nodes as deleted initially
+    Node *current = node->child;
+    while (current) {
+        current->is_deleted = 1;
+        current = current->sibling;
+    }
 
-    if (node->type == FILE_NODE) {
-        char *current_checksum = calculateChecksum(fullPath);
-        if (!current_checksum) {
-            fprintf(stderr, "Checksum calculation failed for %s\n", fullPath);
-            return;
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
         }
 
-        if (!node->is_uploaded || !node->checksum || strcmp(node->checksum, current_checksum) != 0) {
-            uploadFile(node, fullPath);
+        char filepath[MAX_PATH];
+        snprintf(filepath, MAX_PATH, "%s/%s", dirpath, entry->d_name);
+
+        struct stat file_stat;
+        if (stat(filepath, &file_stat) == -1) {
+            perror("Failed to get file stats");
+            continue;
+        }
+
+        Node *current = node->child;
+        Node *found = NULL;
+        while (current) {
+            if (strcmp(current->name, entry->d_name) == 0) {
+                found = current;
+                break;
+            }
+            current = current->sibling;
+        }
+
+        if (S_ISREG(file_stat.st_mode)) {
+            char *new_checksum = calculateChecksum(filepath);
+            if (found) {
+                // File already exists, mark as not deleted
+                found->is_deleted = 0;
+
+                // Compare checksums
+                if (found->checksum && strcmp(found->checksum, new_checksum) != 0) {
+                    printf("File changed: %s\n", filepath);
+                    free(found->checksum);
+                    found->checksum = new_checksum;
+                } else {
+                    free(new_checksum);
+                }
+            } else {
+                // Add new file node
+                Node *file_node = create_node(entry->d_name, FILE_NODE);
+                file_node->checksum = new_checksum;
+                file_node->is_deleted = 0;
+                add_child(node, file_node);
+            }
+        } else if (S_ISDIR(file_stat.st_mode)) {
+            if (found) {
+                // Directory already exists, mark as not deleted
+                found->is_deleted = 0;
+                processTree(filepath, found);
+            } else {
+                // Add new folder node
+                Node *folder_node = create_node(entry->d_name, FOLDER_NODE);
+                folder_node->is_deleted = 0;
+                add_child(node, folder_node);
+                processTree(filepath, folder_node);
+            }
+        }
+    }
+
+    closedir(dir);
+
+    // Remove any nodes still marked as deleted
+    Node *prev = NULL;
+    Node *child = node->child;
+    while (child) {
+        if (child->is_deleted) {
+            printf("File or directory deleted: %s\n", child->name);
+            Node *to_delete = child;
+
+            if (prev) {
+                prev->sibling = child->sibling;
+            } else {
+                node->child = child->sibling;
+            }
+
+            child = child->sibling;
+            free_tree(to_delete);
         } else {
-            printf("File is unchanged: %s\n", fullPath);
-        }
-
-        free(current_checksum);
-    } else if (node->type == FOLDER_NODE) {
-        Node *child = node->child;
-        while (child) {
-            processNode(child, fullPath);
+            prev = child;
             child = child->sibling;
         }
     }
 }
+

@@ -13,6 +13,7 @@ Node *create_node(const char *name, NodeType type) {
     new_node->checksum = NULL;
     new_node->blob_id = NULL;
     new_node->is_uploaded = 0;
+    new_node->is_deleted=0;
 
     return new_node;
 }
