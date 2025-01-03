@@ -37,7 +37,7 @@ void processDirectory(const char *dirpath, Node *parent) {
             size_t size;
             char *content = readFileContents(filepath, &size);
             if (content) {
-                free(content);  // We only need the file content temporarily
+                free(content);
             }
 
             Node *file_node = create_node(entry->d_name, FILE_NODE);

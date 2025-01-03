@@ -24,5 +24,10 @@ void add_child(Node *parent, Node *child);
 void free_node(Node *node);
 void free_tree(Node *node);
 void print_tree(const Node *root, int depth);
+void write_string(FILE *file, const char *str);
+char *read_string(FILE *file);
+void save_node(FILE *file, Node *node);
+Node *load_node(FILE *file);
+void free_node(Node *node);
 
 #endif // NODE_H
