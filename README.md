@@ -4,5 +4,5 @@ Automated cloud based file backup solution. Select file directories on a client 
 
 ## Startup command 
 Backup command inside **client/** directory
-- gcc -o cloud_vault src/*.c -Iinclude -lcrypto
+- gcc -o out src/*.c -Iinclude -lcrypto
 
