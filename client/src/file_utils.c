@@ -111,9 +111,9 @@ void processTree(const char *dirpath, Node *node) {
                 }
             } else {
                 // Add new file node
+		printf("New File: %s\n", entry->d_name);
                 Node *file_node = create_node(entry->d_name, FILE_NODE);
                 file_node->checksum = new_checksum;
-                file_node->is_deleted = 0;
                 add_child(node, file_node);
             }
         } else if (S_ISDIR(file_stat.st_mode)) {
@@ -123,6 +123,7 @@ void processTree(const char *dirpath, Node *node) {
                 processTree(filepath, found);
             } else {
                 // Add new folder node
+		printf("New Folder found: %s\n", entry->d_name);
                 Node *folder_node = create_node(entry->d_name, FOLDER_NODE);
                 folder_node->is_deleted = 0;
                 add_child(node, folder_node);
