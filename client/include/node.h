@@ -10,14 +10,14 @@
 typedef enum { FILE_NODE, FOLDER_NODE } NodeType;
 
 typedef struct Node {
-    char name[MAX_NAME_LENGTH];
-    NodeType type;
-    char *checksum;
-    char *blob_id;
-    int is_uploaded;
-    int is_deleted;
-    struct Node *child;
-    struct Node *sibling;
+  char name[MAX_NAME_LENGTH];
+  NodeType type;
+  char *checksum;
+  char *blob_id;
+  int is_uploaded;
+  int is_deleted;
+  struct Node *child;
+  struct Node *sibling;
 } Node;
 
 Node *create_node(const char *name, NodeType type);
