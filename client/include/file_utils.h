@@ -11,12 +11,11 @@
 char *readFileContents(const char *filepath, size_t *size);
 
 /* Uploads a file to the server and updates its metadata */
-void uploadFile(Node *node, const char *filepath);
+void uploadFile(Node *node, const char *filepath, int server_sockt);
 
 /* Processes a node recursively, checking for file changes */
 void processNode(Node *node, const char *currentPath);
 
-void processTree(const char *dirpath, Node *node);
-
+void processTree(const char *dirpath, Node *node, int server_socket);
 
 #endif // FILE_UTILS_H

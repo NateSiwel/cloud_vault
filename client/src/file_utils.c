@@ -1,16 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <dirent.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/sockets.h>
 #include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <dirent.h>
 #include "file_utils.h"
 #include "node.h"
 #include "checksum.h"
 
-/* Reads file contents using fread */
+/* returns file contents using fread */
 char *readFileContents(const char *filepath, size_t *size) {
   FILE *file = fopen(filepath, "rb");
   if (!file) {
@@ -36,16 +38,42 @@ char *readFileContents(const char *filepath, size_t *size) {
   }
 
   fread(content, 1, *size, file);
-  content[*size] = '\0';
   fclose(file);
 
   return content;
 }
 
 /* Uploads file to server and updates the node */
-void uploadFile(Node *node, const char *filepath) {
+void uploadFile(Node *node, const char *filepath, int server_socket) {
   printf("Uploading file: %s\n", filepath);
 
+  size_t file_size;
+  char *file_content = readFileContents(filepath, &file_size);
+  if(!file_content) {
+    fprintf(stderr, "Could not read file %s to send to the server. \n", filepath);
+    return;
+  }
+
+  // send filename size
+  size_t filename_size = strlen(node->name);
+  send(server_socket, &filename_size, sizeof(filename_size), 0);
+
+  // send filename 
+  send(server_socket, node->name, filename_size, 0);
+
+  // send file size
+  send(server_socket, &file_size, sizeof(file_size), 0);
+
+  // send file contents
+  ssize_t bytes_sent = send(server_socket, file_content, file_size, 0);
+  if (bytes_sent == -1)
+  {
+    perror("Error sending file data to server");
+    free(file_content);
+    return;
+  }
+
+  // Sent data. Update local node.
   node->is_uploaded = 1;
 
   char *new_checksum = calculateChecksum(filepath);
@@ -55,17 +83,22 @@ void uploadFile(Node *node, const char *filepath) {
   }
   printf("Checksum: %s\n", new_checksum);
 
-  node->blob_id = strdup("unique_blob_id");  // Replace with server-generated ID
+  node->blob_id = strdup("unique_blob_id"); // COME BACK LATER
+  free(file_content); 
 }
 
-void processTree(const char *dirpath, Node *node) {
+/* compare node w/ local file changes, and upload to server through server_socket.
+ * the core of the backup logic. 
+ */
+void processTree(const char *dirpath, Node *node, int server_socket) {
   DIR *dir = opendir(dirpath);
   if (!dir) {
     perror("Failed to open directory");
     return;
   }
 
-  // Mark all existing child nodes as deleted initially
+  // setting nodes as deleted initially and reverting  
+  // back if found on filesystem.
   Node *current = node->child;
   while (current) {
     current->is_deleted = 1;
@@ -100,7 +133,7 @@ void processTree(const char *dirpath, Node *node) {
     if (S_ISREG(file_stat.st_mode)) {
       char *new_checksum = calculateChecksum(filepath);
       if (found) {
-	// File already exists, mark as not deleted
+	// File exists, mark as not deleted
 	found->is_deleted = 0;
 
 	// Compare checksums
@@ -108,6 +141,7 @@ void processTree(const char *dirpath, Node *node) {
 	  printf("File changed: %s\n", filepath);
 	  free(found->checksum);
 	  found->checksum = new_checksum;
+	  uploadFile(found, filepath, server_socket);
 	} else {
 	  free(new_checksum);
 	}
@@ -115,21 +149,31 @@ void processTree(const char *dirpath, Node *node) {
 	// Add new file node
 	printf("New File: %s\n", entry->d_name);
 	Node *file_node = create_node(entry->d_name, FILE_NODE);
+	if (!file_node) {
+	  fprintf(stderr, "Failed to create node for %s\n", entry->d_name);
+	  free(new_checksum);
+	  continue;
+	}
 	file_node->checksum = new_checksum;
 	add_child(node, file_node);
+	uploadFile(file_node, filepath, server_socket);
       }
     } else if (S_ISDIR(file_stat.st_mode)) {
       if (found) {
 	// Directory already exists, mark as not deleted
 	found->is_deleted = 0;
-	processTree(filepath, found);
+	processTree(filepath, found, server_socket);
       } else {
 	// Add new folder node
 	printf("New Folder found: %s\n", entry->d_name);
 	Node *folder_node = create_node(entry->d_name, FOLDER_NODE);
+	if (!folder_node) {
+	  fprintf(stderr, "Failed to create node for %s\n", entry->d_name);
+	  continue;
+	}
 	folder_node->is_deleted = 0;
 	add_child(node, folder_node);
-	processTree(filepath, folder_node);
+	processTree(filepath, folder_node, server_socket);
       }
     }
   }
@@ -158,4 +202,3 @@ void processTree(const char *dirpath, Node *node) {
     }
   }
 }
-
