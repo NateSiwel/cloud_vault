@@ -5,10 +5,12 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/stat.h>
 
 #define PORT 8080
 #define MAX_CLIENTS 1  
 #define BUFFER_SIZE 1024 
+#define BACKUP_DIR "backup"
 
 /* 
  * Server logic to accept connection and data from client
@@ -23,6 +25,18 @@ int main() {
   size_t file_size;
   char *filename = NULL;
   char *file_content = NULL;
+  char filepath[256];
+
+  // Create the backup directory if it doesn't exist in the current directory
+  struct stat st = {0};
+  if (stat(BACKUP_DIR, &st) == -1) {
+    if (mkdir(BACKUP_DIR, 0777) == -1) {
+      perror("Error creating backup directory");
+      return 1;
+    } else {
+      printf("Created backup directory: %s\n", BACKUP_DIR);
+    }
+  }
 
   server_socket = socket(AF_INET, SOCK_STREAM, 0);
   if (server_socket == -1) {
@@ -129,14 +143,18 @@ int main() {
 	break;
       }
 
+      /*
       printf("Received file data, first 50 bytes or less:\n");
       for(int i = 0; i < 50 && i < file_size; i++) {
 	printf("%c", file_content[i]);
       }
       printf("...\n");
+      */
+
+      snprintf(filepath, sizeof(filepath), "%s/%s", BACKUP_DIR, filename);
 
       // Reconstruct the file and store it on disk
-      FILE *fp = fopen(filename, "wb");
+      FILE *fp = fopen(filepath, "wb");
       if (fp == NULL) {
 	perror("Error opening file for writing");
       } else {
@@ -144,7 +162,7 @@ int main() {
 	if (bytes_written < file_size) {
 	  perror("Error writing to file");
 	} else {
-	  printf("File '%s' saved successfully (%zu bytes).\n", filename, bytes_written);
+	  printf("File '%s' saved successfully to '%s' (%zu bytes).\n", filename, filepath, bytes_written);
 	}
 	fclose(fp);
       }

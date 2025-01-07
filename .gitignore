@@ -1,3 +1,4 @@
 client/node_data.bin
 client/out
 server/src/a.out
+server/src/backup
