@@ -135,11 +135,24 @@ int main() {
       }
       printf("...\n");
 
+      // Reconstruct the file and store it on disk
+      FILE *fp = fopen(filename, "wb");
+      if (fp == NULL) {
+	perror("Error opening file for writing");
+      } else {
+	size_t bytes_written = fwrite(file_content, 1, file_size, fp);
+	if (bytes_written < file_size) {
+	  perror("Error writing to file");
+	} else {
+	  printf("File '%s' saved successfully (%zu bytes).\n", filename, bytes_written);
+	}
+	fclose(fp);
+      }
+
       free(filename);
       free(file_content);
       filename = NULL;
       file_content = NULL;
-
     }
 
     close(client_socket);
