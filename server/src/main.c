@@ -108,6 +108,23 @@ int main() {
       filename[filename_size] = '\0';
       printf("Filename: %s\n", filename);
 
+      // if filename ends with '/', type is folder. mkdir here, then restart loop. 
+      // This logic works, but is dependent on recieving folders from the client before the files that are within them.
+      // Shouldn't be a problem with current client code.
+      if (filename[filename_size - 1] == '/') {
+	snprintf(filepath, sizeof(filepath), "%s/%s", BACKUP_DIR, filename);
+	if (mkdir(filepath, 0777) == -1) {
+	  perror("Error creating directory");
+	} else {
+	  printf("Created directory: %s\n", filepath);
+	}
+
+	free(filename);
+
+	filename = NULL;
+	continue;
+      }
+
       // Receive file size - disconnect if 0 
       bytes_received = recv(client_socket, &file_size, sizeof(file_size), 0);
       if (bytes_received <= 0) {
@@ -142,14 +159,6 @@ int main() {
 	free(file_content);
 	break;
       }
-
-      /*
-      printf("Received file data, first 50 bytes or less:\n");
-      for(int i = 0; i < 50 && i < file_size; i++) {
-	printf("%c", file_content[i]);
-      }
-      printf("...\n");
-      */
 
       snprintf(filepath, sizeof(filepath), "%s/%s", BACKUP_DIR, filename);
 

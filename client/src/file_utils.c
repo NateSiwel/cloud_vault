@@ -44,33 +44,52 @@ char *readFileContents(const char *filepath, size_t *size) {
 }
 
 /* Uploads file to server and updates the node */
-void uploadFile(Node *node, const char *filepath, int server_socket) {
-  printf("Uploading file: %s\n", filepath);
+char filechar = '/';
+void uploadFile(Node *node, char *filepath, int server_socket) {
+  printf("Uploading: %s\n", filepath);
 
-  size_t file_size;
-  char *file_content = readFileContents(filepath, &file_size);
-  if(!file_content) {
-    fprintf(stderr, "Could not read file %s to send to the server. \n", filepath);
-    return;
-  }
+  // will send folders as path: './folder/' and file as './file' 
+  // appending '/' to folders. Server will respond according to type.
+  
+  // DEPENDENT ON FILES NOT ENDING WITH /
+  if (node->type == FILE_NODE) {
+    size_t file_size;
+    char *file_content = readFileContents(filepath, &file_size);
+    if(!file_content) {
+      fprintf(stderr, "Could not read file %s to send to the server. \n", filepath);
+      return;
+    }
 
-  // send filename size
-  size_t filename_size = strlen(node->name);
-  send(server_socket, &filename_size, sizeof(filename_size), 0);
+    // send name size
+    size_t filename_size = strlen(filepath);
+    send(server_socket, &filename_size, sizeof(filename_size), 0);
 
-  // send filename 
-  send(server_socket, node->name, filename_size, 0);
+    // send name 
+    send(server_socket, filepath, filename_size, 0);
 
-  // send file size
-  send(server_socket, &file_size, sizeof(file_size), 0);
+    // send file size
+    send(server_socket, &file_size, sizeof(file_size), 0);
 
-  // send file contents
-  ssize_t bytes_sent = send(server_socket, file_content, file_size, 0);
-  if (bytes_sent == -1)
-  {
-    perror("Error sending file data to server");
-    free(file_content);
-    return;
+    // send file contents
+    ssize_t bytes_sent = send(server_socket, file_content, file_size, 0);
+    if (bytes_sent == -1)
+    {
+      perror("Error sending file data to server");
+      free(file_content);
+      return;
+    }
+    free(file_content); 
+  } else {
+    int l = strlen(filepath);
+    filepath[l] = filechar;
+    filepath[l+1] = '\0';
+
+    // send name size
+    size_t filename_size = strlen(filepath);
+    send(server_socket, &filename_size, sizeof(filename_size), 0);
+
+    // send name 
+    send(server_socket, filepath, filename_size, 0);
   }
 
   // Sent data. Update local node.
@@ -84,7 +103,6 @@ void uploadFile(Node *node, const char *filepath, int server_socket) {
   printf("Checksum: %s\n", new_checksum);
 
   node->blob_id = strdup("unique_blob_id"); // COME BACK LATER
-  free(file_content); 
 }
 
 /* compare node w/ local file changes, and upload to server through server_socket.
@@ -173,6 +191,7 @@ void processTree(const char *dirpath, Node *node, int server_socket) {
 	}
 	folder_node->is_deleted = 0;
 	add_child(node, folder_node);
+	uploadFile(folder_node, filepath, server_socket);
 	processTree(filepath, folder_node, server_socket);
       }
     }

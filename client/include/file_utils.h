@@ -11,7 +11,7 @@
 char *readFileContents(const char *filepath, size_t *size);
 
 /* Uploads a file to the server and updates its metadata */
-void uploadFile(Node *node, const char *filepath, int server_sockt);
+void uploadFile(Node *node, char *filepath, int server_sockt);
 
 /* Processes a node recursively, checking for file changes */
 void processNode(Node *node, const char *currentPath);
