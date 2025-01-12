@@ -79,6 +79,19 @@ void uploadFile(Node *node, char *filepath, int server_socket) {
       return;
     }
     free(file_content); 
+
+    // Receive processing status from server
+    int processing_status;
+    if (recv(server_socket, &processing_status, sizeof(processing_status), 0) > 0) {
+      if (processing_status == 1) {
+	printf("Server successfully processed file: %s\n", filepath);
+      } else {
+	fprintf(stderr, "Server failed to process file: %s\n", filepath);
+      }
+    } else {
+      perror("Error receiving processing status from server");
+    }
+
   } else {
     int l = strlen(filepath);
     filepath[l] = filechar;
@@ -90,6 +103,18 @@ void uploadFile(Node *node, char *filepath, int server_socket) {
 
     // send name 
     send(server_socket, filepath, filename_size, 0);
+
+    // Receive processing status from server
+    int processing_status;
+    if (recv(server_socket, &processing_status, sizeof(processing_status), 0) > 0) {
+      if (processing_status == 1) {
+	printf("Server successfully processed directory: %s\n", filepath);
+      } else {
+	fprintf(stderr, "Server failed to process directory: %s\n", filepath);
+      }
+    } else {
+      perror("Error receiving processing status from server");
+    }
   }
 
   // Sent data. Update local node.

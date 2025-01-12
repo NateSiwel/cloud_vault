@@ -77,11 +77,6 @@ int main() {
   save_node(file, root);
   fclose(file);
 
-  // must wait for server to recieve all data before 
-  // calling close
-  /* NEEDS IMRPOVEMENT */
-  sleep(2);
-
   close(server_socket);
   free_tree(root);
   return 0;

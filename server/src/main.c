@@ -26,6 +26,7 @@ int main() {
   char *filename = NULL;
   char *file_content = NULL;
   char filepath[256];
+  int processing_status;
 
   // Create the backup directory if it doesn't exist in the current directory
   struct stat st = {0};
@@ -115,12 +116,15 @@ int main() {
 	snprintf(filepath, sizeof(filepath), "%s/%s", BACKUP_DIR, filename);
 	if (mkdir(filepath, 0777) == -1) {
 	  perror("Error creating directory");
+	  processing_status = -1;
 	} else {
 	  printf("Created directory: %s\n", filepath);
+	  processing_status = 1; 
 	}
 
-	free(filename);
+	send(client_socket, &processing_status, sizeof(processing_status), 0);
 
+	free(filename);
 	filename = NULL;
 	continue;
       }
@@ -166,15 +170,20 @@ int main() {
       FILE *fp = fopen(filepath, "wb");
       if (fp == NULL) {
 	perror("Error opening file for writing");
+	processing_status = -1; 
       } else {
 	size_t bytes_written = fwrite(file_content, 1, file_size, fp);
 	if (bytes_written < file_size) {
 	  perror("Error writing to file");
+	  processing_status = -1; 
 	} else {
 	  printf("File '%s' saved successfully to '%s' (%zu bytes).\n", filename, filepath, bytes_written);
+	  processing_status = 1;
 	}
 	fclose(fp);
       }
+
+      send(client_socket, &processing_status, sizeof(processing_status),0);
 
       free(filename);
       free(file_content);
